@@ -4,6 +4,8 @@
 import sys
 import csv
 import os
+import re
+from enum import Enum
 
 import gi
 gi.require_version('Gimp', '3.0')
@@ -20,10 +22,25 @@ from gi.repository import Gio
 
 plug_in_proc = "vd-variable-data"
 
+class LayerProperty(Enum):
+    VISIBILITY = 'visibility'
+    FOREGROUND = 'foreground'
+    BACKGROUND = 'background'
+    TEXT = 'text'
+    
+def str_to_bool(str):
+    match str.lower():
+        case 'true': return True
+        case 'false': return False
+        case _: raise RuntimeError(f"Cannot convert string '{str}' into bool.")
+    
+def calling_error(procedure, message):
+    return procedure.new_return_values(Gimp.PDBStatusType.CALLING_ERROR, GLib.Error(f"{plug_in_proc}: {message}"))
+
 def run_dialog(procedure, run_mode, config):
     # TODO: Write a custom dialog
     if run_mode != Gimp.RunMode.INTERACTIVE:
-        return procedure.new_return_values(Gimp.PDBStatusType.CANCEL, GLib.Error())
+        return procedure.new_return_values(Gimp.PDBStatusType.CANCEL, GLib.Error("Runmode is not interactive."))
     
     GimpUi.init('python-fu-test-dialog')
     Gegl.init(None)
@@ -31,12 +48,12 @@ def run_dialog(procedure, run_mode, config):
     dialog.fill(None)
     if not dialog.run():
         dialog.destroy()
-        return procedure.new_return_values(Gimp.PDBStatusType.CANCEL, GLib.Error())
+        return procedure.new_return_values(Gimp.PDBStatusType.CANCEL, GLib.Error("Unable to open dialog window."))
     else:
         dialog.destroy()
 
-def get_text_layers_by_name(image):
-    return { layer.get_name(): layer for layer in image.get_layers() if layer.is_text_layer() }
+def get_layers_by_name(image):
+    return { layer.get_name(): layer for layer in image.get_layers() }
 
 def get_paths_by_name(image):
     return { path.get_name(): path for path in image.get_paths() }
@@ -46,6 +63,27 @@ def get_top_most_drawable(image):
         if layer.is_drawable() and not layer.is_text_layer():
             return layer
     return None
+
+def fill_path(image, path, fill_type):
+    image.select_item(Gimp.ChannelOps.REPLACE, path)
+    Gimp.context_set_opacity(100)
+    Gimp.context_set_paint_mode(Gimp.LayerMode.NORMAL_LEGACY)
+    get_top_most_drawable(image).edit_fill(fill_type)
+    
+def fill_item(image, item, color_str, fill_type):
+    color = Gegl.Color.new(color_str)
+    
+    if fill_type == Gimp.FillType.FOREGROUND:
+        Gimp.context_set_foreground(color)
+    elif fill_type == Gimp.FillType.BACKGROUND:
+        Gimp.context_set_background(color)
+    else:
+        raise RuntimeError('Fill type not supported.')
+    
+    if item.is_path():
+        fill_path(image, item, fill_type)
+    else:
+        item.edit_fill(fill_type)
 
 # Written by hnbdr / https://gist.github.com/hnbdr/2c28a02d48a9f5c8127a29b8c551aec9
 def call_procedure(name, **kwargs):
@@ -88,62 +126,80 @@ def variable_data(procedure, run_mode, image, drawables, config, run_data):
         return dialog_result
 
     csv_filename = config.get_property('csv_filename')
-    pdf_directory = config.get_property('pdf_directory')
-    pdf_filename = config.get_property('pdf_filename')
+    output_directory = config.get_property('output_directory')
+    base_filename = config.get_property('base_filename')
     
-    new_image = image.duplicate()
-    drawable = get_top_most_drawable(new_image)
-    text_layers_by_name = get_text_layers_by_name(new_image)
-    paths_by_name = get_paths_by_name(new_image)
+    if re.search(r'[<>:/\\|?*\"]|[\0-\31]', base_filename) or re.match(r'^[. ]|.*[. ]$', base_filename):
+        return calling_error(procedure, f"Filename '{base_filename}' is invalid.")
     
-    if drawable == None:
-        return procedure.new_return_values(Gimp.PDBStatusType.CALLING_ERROR, 
-                                           GLib.Error(f"Procedure '{plug_in_proc}' requieres a layer to work."))
+    if not os.path.isdir(output_directory):
+        return calling_error(procedure, f"Directory {output_directory} not found.")
 
-    images = [] # saved list of generated images
-
-    # for each line in the csv
     with open(csv_filename, "r") as csv_file:
-        row_count = sum(1 for row in csv_file) - 1
+        header_row_count = 2
+        row_count = sum(1 for _ in csv_file) - header_row_count
         csv_file.seek(0)
 
-        for rindex, row in enumerate(csv.reader(csv_file), 0):
+        for rindex, row in enumerate(csv.reader(csv_file)):
             if rindex == 0:
                 layer_names = row
                 continue
             
-            filename = row[0]
+            if rindex == 1:
+                layer_types = row
+                continue
+            
+            rindex = rindex - header_row_count + 1 # Row index in range [0 - row_count]
+            duplicate_image = image.duplicate()
+            first_drawable = get_top_most_drawable(duplicate_image)
+            layers_by_name = get_layers_by_name(duplicate_image)
+            paths_by_name = get_paths_by_name(duplicate_image)
+            
+            if first_drawable == None:
+                return calling_error(procedure, "Requieres a layer to work.")
 
-            # fill-in the template parameters
-            for cindex, value in enumerate(row[1:], 1):
+            for cindex, value in enumerate(row):
                 layer_name = layer_names[cindex]
-                color = Gegl.Color.new(value)
-
-                if layer_name in text_layers_by_name:
-                    text_layers_by_name[layer_name].set_color(color)
+                layer_type = layer_types[cindex]
+                
+                # NOTE: Document that layer take precedence over homonimous paths
+                if layer_name in layers_by_name:
+                    item = layers_by_name[layer_name]
                 elif layer_name in paths_by_name:
-                    new_image.select_item(Gimp.ChannelOps.REPLACE, paths_by_name[layer_name])
-                    Gimp.context_set_opacity(100)
-                    Gimp.context_set_paint_mode(Gimp.LayerMode.NORMAL_LEGACY)
-                    Gimp.context_set_background(color)
-                    drawable.edit_fill(Gimp.FillType.BACKGROUND)
+                    item = paths_by_name[layer_name]
                 else:
-                    return procedure.new_return_values(Gimp.PDBStatusType.CALLING_ERROR, 
-                                           GLib.Error(f"Layer '{layer_name}' not found."))
+                    return calling_error(procedure, f"Layer '{layer_name}' not found.")
+                
+                match layer_type:
+                    case LayerProperty.VISIBILITY.value:
+                        try:
+                            value = str_to_bool(value)
+                        except RuntimeError:
+                            return calling_error(procedure, f"Could not convert {value} to bool [{cindex}:{rindex}]")
+                        item.set_visible(value)
+                    case LayerProperty.FOREGROUND.value:
+                        fill_item(duplicate_image, item, value, Gimp.FillType.FOREGROUND)
+                    case LayerProperty.BACKGROUND.value:
+                        fill_item(duplicate_image, item, value, Gimp.FillType.BACKGROUND)
+                    case LayerProperty.TEXT.value:
+                        if not item.is_text_layer():
+                            return calling_error(procedure, f"Layer is not text [{cindex}:{rindex}]")
+                        item.set_text(value)
+                    case _:
+                        return calling_error(procedure, f"Invalid layer property [{cindex}:{rindex}]")
 
-            dirname = os.path.dirname(os.path.abspath(filename))
-            if not os.path.isdir(dirname):
-                os.makedirs(dirname)
-
-            call_procedure('file-pdf-export', image=new_image, file=Gio.File.new_for_path(filename), options=None)
-            images.append(new_image)
+            filename = base_filename.replace("$n", str(rindex))
+            filename = os.path.join(output_directory, filename)
+            file = Gio.File.new_for_path(filename)
+            Gimp.file_save(Gimp.RunMode.NONINTERACTIVE, duplicate_image, file, options=None)
             Gimp.progress_update((rindex) / float(row_count))
             Gimp.progress_set_text("%s of %s" % (rindex, row_count))
-
-        # lastly save the pdf
-        pdf_filename = "file://" + os.path.join(pdf_directory, pdf_filename)
-        # FIXME: uri parameter is ignored, a dialog is shown to ask the user to configure the export
-        call_procedure("file-pdf-export-multi", images=images, uri=pdf_filename)
+            duplicate_image.delete()
+            
+        try:
+            Gimp.file_show_in_file_manager(file)
+        except gi.repository.GLib.GError:
+            pass    
         return procedure.new_return_values(Gimp.PDBStatusType.SUCCESS, GLib.Error())
 
 class VariableData (Gimp.PlugIn):
@@ -164,13 +220,15 @@ class VariableData (Gimp.PlugIn):
                                     "will generate individual pdf files, save each of those in " + \
                                     "specific folder with specific name, then group all those files in new pdf file for printing.",
                                     name)
-        procedure.set_attribution("Joseph N. M.", "Joseph N. M.", "2018")
+        procedure.set_attribution("https://github.com/VulcanShot", "https://github.com/VulcanShot", "2025")
         
-        procedure.add_file_argument("csv_filename", "CSV File", None, Gimp.FileChooserAction.OPEN, False, None, # FileChooserAction.ANY (?
-                                    GObject.ParamFlags.READWRITE)
-        procedure.add_file_argument("pdf_directory", "PDF Directory", None, Gimp.FileChooserAction.SELECT_FOLDER, False, None,
-                                    GObject.ParamFlags.READWRITE)
-        procedure.add_string_argument("pdf_filename", "PDF File", None, "out.pdf", GObject.ParamFlags.READWRITE)
+        procedure.add_file_argument("csv_filename", "Data set (CSV):", "The CSV file with the variable data.",
+                                    Gimp.FileChooserAction.OPEN, False, None, GObject.ParamFlags.READWRITE)
+        procedure.add_file_argument("output_directory", "Output directory:", "The directory where the output files will be placed.",
+                                    Gimp.FileChooserAction.SELECT_FOLDER, False, None, GObject.ParamFlags.READWRITE)
+        procedure.add_string_argument("base_filename", "Base filename:",
+                                      "The filename of the output files. A $n will be replaced by the index number.",
+                                      "output_$n.pdf", GObject.ParamFlags.READWRITE)
 
         return procedure
     

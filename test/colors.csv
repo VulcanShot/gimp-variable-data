@@ -1,8 +1,9 @@
-File,path1,path2,path3,path4,path5,path6,path7,path8,path9,path10,path11,text1,text2,text3,text4,text5,text6,text7,text8,text9,text10,text11
-proj1/test1.pdf,#111111,#222222,#333333,#444444,#555555,#666666,#777777,#888888,#999999,#aaaaaa,#bbbbbb,#ffffff,#eeeeee,#dddddd,#00ffff,#ffffff,#ffffff,#ffffff,#ffffff,#ffffff,#ffffff,#ffff00
-proj1/test2.pdf,#00ffff,#ff00ff,#ffff00,#aaffff,#ffaaff,#ffffaa,#eeffff,#ffeeff,#ffffee,#00ffff,#ff00ff,#ffffff,#ffffff,#ffffff,#ffffff,#ffffff,#ffffff,#000000,#000000,#000000,#000000,#000000
-proj1/test1.pdf,#111111,#222222,#333333,#444444,#555555,#666666,#777777,#888888,#999999,#aaaaaa,#bbbbbb,#ffffff,#eeeeee,#dddddd,#00ffff,#ffffff,#ffffff,#ffffff,#ffffff,#ffffff,#ffffff,#ffff00
-proj1/test2.pdf,#00ffff,#ff00ff,#ffff00,#aaffff,#ffaaff,#ffffaa,#eeffff,#ffeeff,#ffffee,#00ffff,#ff00ff,#ffffff,#ffffff,#ffffff,#ffffff,#ffffff,#ffffff,#000000,#000000,#000000,#000000,#000000
-proj1/test3.pdf,#01ffff,#ff01ff,#ffff01,#aaffff,#ffaaff,#ffffaa,#eeffff,#ffeeff,#ffffee,#01ffff,#ff01ff,#ffffff,#ffffff,#ffffff,#ffffff,#ffffff,#ffffff,#000001,#000001,#000001,#000001,#000001
-proj1/test4.pdf,#02ffff,#ff02ff,#ffff02,#aaffff,#ffaaff,#ffffaa,#eeffff,#ffeeff,#ffffee,#02ffff,#ff02ff,#ffffff,#ffffff,#ffffff,#ffffff,#ffffff,#ffffff,#000002,#000002,#000002,#000002,#000002
-proj1/test5.pdf,#03ffff,#ff03ff,#ffff03,#aaffff,#ffaaff,#ffffaa,#eeffff,#ffeeff,#ffffee,#03ffff,#ff03ff,#ffffff,#ffffff,#ffffff,#ffffff,#ffffff,#ffffff,#000003,#000003,#000003,#000003,#000003
+path1,path2,path3,path4,path5,path6,path7,path8,path9,path10,path11,text1,text2,text3,text4,text5,text6,text7,text8,text9,text10,text11
+foreground,background,foreground,background,foreground,background,foreground,background,foreground,background,foreground,background,visibility,text,foreground,background,foreground,text,foreground,background,background,text
+#111111,#222222,#333333,#444444,#555555,#666666,#777777,#888888,#999999,#aaaaaa,#bbbbbb,#ffffff,false,#dddddd,#00ffff,#ffffff,#ffffff,#ffffff,#ffffff,#ffffff,#ffffff,hello
+#00ffff,#ff00ff,#ffff00,#aaffff,#ffaaff,#ffffaa,#eeffff,#ffeeff,#ffffee,#00ffff,#ff00ff,#ffffff,true,#ffffff,#ffffff,#ffffff,#ffffff,#000000,#000000,#000000,#000000,world
+#111111,#222222,#333333,#444444,#555555,#666666,#777777,#888888,#999999,#aaaaaa,#bbbbbb,#ffffff,false,#dddddd,#00ffff,#ffffff,#ffffff,#ffffff,#ffffff,#ffffff,#ffffff,hello world
+#00ffff,#ff00ff,#ffff00,#aaffff,#ffaaff,#ffffaa,#eeffff,#ffeeff,#ffffee,#00ffff,#ff00ff,#ffffff,True,#ffffff,#ffffff,#ffffff,#ffffff,#000000,#000000,#000000,#000000,foo bar
+#01ffff,#ff01ff,#ffff01,#aaffff,#ffaaff,#ffffaa,#eeffff,#ffeeff,#ffffee,#01ffff,#ff01ff,#ffffff,TRUE,#ffffff,#ffffff,#ffffff,#ffffff,#000001,#000001,#000001,#000001,bar
+#02ffff,#ff02ff,#ffff02,#aaffff,#ffaaff,#ffffaa,#eeffff,#ffeeff,#ffffee,#02ffff,#ff02ff,#ffffff,FALSE,#ffffff,#ffffff,#ffffff,#ffffff,#000002,#000002,#000002,#000002,foo
+#03ffff,#ff03ff,#ffff03,#aaffff,#ffaaff,#ffffaa,#eeffff,#ffeeff,#ffffee,#03ffff,#ff03ff,#ffffff,FALSE,#ffffff,#ffffff,#ffffff,#ffffff,#000003,#000003,#000003,#000003,foobarz
