@@ -74,6 +74,9 @@ def fill_item(image, item, color_str, fill_type):
     color = Gegl.Color.new(color_str)
     
     if fill_type == Gimp.FillType.FOREGROUND:
+        if item.is_text_layer():
+            item.set_color(color)
+            return
         Gimp.context_set_foreground(color)
     elif fill_type == Gimp.FillType.BACKGROUND:
         Gimp.context_set_background(color)
